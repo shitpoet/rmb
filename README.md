@@ -1,10 +1,10 @@
 # rmb
 
-Open links in new foreground tab by right click, open context menu for a litle bit longer right click.
+Open links in new foreground tab by right click, open context menu for a little bit longer right click.
 
-Chrome forbids programmatical opening of context menu, so this extension needs a workaround.
+Chrome forbids programmatical opening of context menu, so this extension uses a workaround.
 
-A workaround is to simulate user input to open the menu.
+The workaround is to simulate user input to open the menu.
 
 This is done by this bash script:
 
@@ -15,8 +15,8 @@ This is done by this bash script:
     xdotool click 3
     . $0
 
-This script listens at 64727 and on any request sends RMB to the active window.
+The script listens at 64727 and on any request sends RMB to the active window.
 
 (In this way it is also possible to programmatically open Web console. This is forbidden by Chrome too.)
 
-The extension does simple fetch `127.0.0.1:64727` and the script simulates user input for Chrome.
+The extension just does simple fetch `127.0.0.1:64727` and the script simulates user input for Chrome.
