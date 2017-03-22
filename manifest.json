@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "rmb",
+  "description": "Open link in new foreground tab by right click, open context menu by a little bit longer right click",
+  "version": "0.1",
+  "permissions": ["tabs"],
+  "background": {
+    "scripts": ["main.js"]
+  },
+  "content_scripts": [
+    {
+			"matches": ["<all_urls>"],
+      "js": ["main.js"],
+			"run_at": "document_start"
+    }
+  ]
+}
