@@ -44,17 +44,18 @@ if (chrome.management) {
   const lmb = 0, mmb = 1, rmb = 2 // mouse buttons
   const open-time = 140
   const wait-time = 300
-  const min-delta = 32
+  const min-delta = 16
   let active = false
   let press-time = 0
   let down = [false,false,false]
-  let eat-rmb = false
-  let rocket = false
+  //let eat-rmb = false
   let showing-menu = false
   let target-url
   let timer
-  let start-x, delta-x
-  let start-y, delta-y
+  /*let start-x, sum-x, delta-x
+  let start-y, sum-y, delta-y*/
+  let start-x, last-x, sum-x, delta-x
+  let start-y, last-y, sum-y, delta-y
 
   fun stop-event(e)
     e.preventDefault()
@@ -89,59 +90,15 @@ if (chrome.management) {
     log('goto-right-tab')
     execute({goto-right-tab: true})
 
-  fun is_rmb_down(e)
-    ret e.buttons & 4 != 0
+  fun refresh()
+    location.reload()
+
+  /*fun is_rmb_down(e)
+    ret e.buttons & 4 != 0*/
 
   fun mousedown(e)
     log('mousedown', e, e.button, {down})
-    clear-timeout(timer)
-    if !(e.altKey || e.ctrlKey || e.shiftKey)
-      if e.button == lmb && down[rmb]
-        stop-event(e)
-        eat-rmb = true
-        rocket = true
     down[e.button] = true
-
-  fun mouseup(e)
-    //clear-timeout(timer)
-    clear-timeout(timer)
-    log('mouseup', e.button, {active, target-url, showing-menu})
-    //window.removeEventListener('mouseup', mouseup, true)
-    if !(e.altKey || e.ctrlKey || e.shiftKey)
-
-      if e.button == rmb
-        if eat-rmb
-          if rocket
-            rocket = false
-            if active
-              duplicate-tab()
-          eat-rmb = false
-        elif !down[lmb]
-          stop-timer()
-          let delta = e.time-stamp - press-time
-          log('delta',delta,{delta-x,delta-y})
-          let adx = Math.abs(delta-x), ady = Math.abs(delta-y)
-          if adx > min-delta || ady > min-delta
-            if adx > ady
-              if delta-x < 0
-                go-back()
-              else
-                goto-right-tab()
-            else
-              if delta-y < 0
-                duplicate-tab()
-              else
-                close-tab()
-          else
-            if delta < open-time && target-url
-              open-link(target-url)
-            else
-              show-context-menu()
-          stop-event(e)
-      /*elif e.button == 1
-        close-tab()*/
-    down[e.button] = false
-    press-time = 0
 
   /*fun mousewheel(e)
     if down[rmb]
@@ -157,38 +114,80 @@ if (chrome.management) {
         goto-right-tab()*/
 
   fun mousemove(e)
+    log('mousemove')
     if active
-      delta-x = e.x - start-x
-      delta-y = e.y - start-y
+      let x = e.x, y = e.y
+      delta-x = x - start-x
+      delta-y = y - start-y
+      /*sum-x += Math.abs(e.movement-x)
+      sum-y += Math.abs(e.movement-y)*/
+      sum-x += Math.abs(x - last-x)
+      sum-y += Math.abs(y - last-y)
+      last-x = x
+      last-y = y
       log({delta-x,delta-y,start-x,start-y})
 
-  fun stop-timer()
-    //active = false
-    //window.removeEventListener('mousewheel', mousewheel, true)
-    window.removeEventListener('mousemove', mousemove, true)
-    clear-timeout(timer)
+  fun mouseup(e)
+    log('mouseup', e.button, {active, target-url, showing-menu})
+    if active && e.button==rmb && !(e.altKey || e.ctrlKey || e.shiftKey)
+      stop()
+      let delta = e.time-stamp - press-time
+      log('delta',delta,{delta-x,delta-y,sum-x,sum-y})
+      let adx = Math.abs(delta-x), ady = Math.abs(delta-y)
+      if /*adx > 0 && ady > 0 &&*/ (sum-x > min-delta || sum-y > min-delta || adx > min-delta || ady > min-delta)
+        let k = .75
+        if sum-x > sum-y //adx > ady
+          log('kx',sum-x / adx, adx, sum-x)
+          if sum-x > 0 && adx / sum-x < k
+            go-back()
+          else
+            if delta-x < 0
+              goto-left-tab()
+            else
+              goto-right-tab()
+        else
+          log('ky',sum-y / ady, ady, sum-y)
+          if sum-y > 0 && ady / sum-y < k
+            refresh()
+          else
+            if delta-y < 0
+              duplicate-tab()
+            else
+              close-tab()
+      else
+        if delta < open-time && target-url
+          open-link(target-url)
+        else
+          show-context-menu()
+      stop-event(e)
+    down[e.button] = false
 
-  fun start-timer(e)
-    clear-timeout(timer)
+  fun stop()
+    if active
+      active = false
+      //window.removeEventListener('mousewheel', mousewheel, true)
+      window.removeEventListener('mousemove', mousemove, true)
+
+  fun start(e, capture)
     active = true
-    timer = set-timeout(timeout, wait-time)
+    press-time = e.time-stamp
     start-x = e.x
     start-y = e.y
+    last-x = start-x
+    last-y = start-y
     delta-x = 0
     delta-y = 0
-    window.addEventListener('mousemove', mousemove, true)
+    sum-x = 0
+    sum-y = 0
+    if capture
+      window.addEventListener('mousemove', mousemove, true)
     //window.addEventListener('mousewheel', mousewheel, true)
 
-  fun timeout()
+  /*fun timeout()
     log('timeout')
-    stop-timer()
-    active = false
+    active = false*/
 
-  fun contextmenu(e)
-    log('context-menu', showing-menu)
-    stop-timer()
-
-    // if have selection and cursor is over it just show menu
+  fun cursor-at-selection(e)
     let sel = window.getSelection()
     if sel.toString()
       log('have selection',sel,'node',sel.focusNode,'target',e.target)
@@ -196,37 +195,40 @@ if (chrome.management) {
       let target = e.target
       if sel-node == target || sel-node.parent-element == target
         log('click on selection')
-        showing-menu = true
+        ret true
 
-    if showing-menu
-      showing-menu = false
-      eat-rmb = true
-      active = false
-      return;
-
-    press-time = e.time-stamp
-    target-url = ''
-    active = true
-    stop-event(e)
-
+  fun get-link-under-cursor(e)
     for el of e.path
       if el instanceof HTMLAnchorElement
         if 'href' in el
           let url = (''+el.href).trim()
-          if (
-            url &&
+          if (url &&
             !url.startsWith('javascript:') &&
             !url.startsWith('tel:') &&
             !url.startsWith('mailto:')
-          )
-            log('link '+url)
-            //stop-event(e)
-            target-url = url
+          ) ret url
 
-            //window.addEventListener('mouseup', mouseup, true)
-        return;
+  fun contextmenu(e)
+    log('context-menu', showing-menu)
+    stop()
 
-    start-timer(e)
+    if showing-menu || cursor-at-selection(e)
+      showing-menu = false
+      //eat-rmb = true
+      active = false
+      ret; // show menu through default handler
+
+    stop-event(e)
+    target-url = ''
+
+    let url = get-link-under-cursor(e)
+    if url
+      log('link '+url)
+      target-url = url
+      start(e, false)
+      ret;
+
+    start(e, true)
 
   window.addEventListener('mousedown', mousedown, true)
   window.addEventListener('mouseup', mouseup, true)
